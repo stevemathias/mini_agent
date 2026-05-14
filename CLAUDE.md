@@ -66,6 +66,7 @@ Source files and their roles:
 | `OPENAI_API_KEY` | OpenAI + Ollama (ignored by Ollama) |
 | `ANTHROPIC_API_KEY` | Anthropic |
 | `GEMINI_API_KEY` | Google Gemini |
+| `BRAVE_API_KEY` | Brave Search (`web_search` tool) |
 
 ## Default Models
 

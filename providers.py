@@ -260,10 +260,10 @@ def _to_anthropic_tools(openai_tools: list[dict]) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 _DEFAULTS: dict[str, str] = {
-    "openai": "gpt-4o-mini",
-    "anthropic": "claude-haiku-4-5-20251001",
-    "gemini": "gemini-2.0-flash",
-    "ollama": "qwen2.5",
+    "openai": "gpt-5-mini",
+    "anthropic": "claude-haiku-4-5",
+    "gemini": "gemini-2.5-flash",
+    "ollama": "mygemma4",
 }
 
 

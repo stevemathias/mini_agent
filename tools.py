@@ -44,15 +44,65 @@ def calculate(expression: str) -> str:
 
 
 def get_weather(city: str) -> str:
-    # Stub — replace with OpenWeatherMap, WeatherAPI, etc.
-    stub = {
-        "tokyo": "18°C, partly cloudy",
-        "london": "12°C, overcast",
-        "new york": "22°C, sunny",
-        "san francisco": "16°C, foggy",
-        "berlin": "14°C, light rain",
+    import json
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    _WMO = {
+        0: "clear sky",
+        1: "mainly clear", 2: "partly cloudy", 3: "overcast",
+        45: "fog", 48: "icy fog",
+        51: "light drizzle", 53: "moderate drizzle", 55: "heavy drizzle",
+        61: "slight rain", 63: "moderate rain", 65: "heavy rain",
+        71: "slight snow", 73: "moderate snow", 75: "heavy snow", 77: "snow grains",
+        80: "rain showers", 81: "moderate rain showers", 82: "heavy rain showers",
+        85: "snow showers", 86: "heavy snow showers",
+        95: "thunderstorm", 96: "thunderstorm with hail", 99: "thunderstorm with heavy hail",
     }
-    return stub.get(city.lower(), f"20°C, clear skies")
+
+    geo_url = "https://geocoding-api.open-meteo.com/v1/search?" + urllib.parse.urlencode(
+        {"name": city, "count": 1, "language": "en", "format": "json"}
+    )
+    try:
+        with urllib.request.urlopen(geo_url, timeout=10) as r:
+            geo = json.loads(r.read())
+    except Exception as e:
+        return f"Error looking up '{city}': {e}"
+
+    results = geo.get("results")
+    if not results:
+        return f"City '{city}' not found"
+
+    loc = results[0]
+    lat, lon = loc["latitude"], loc["longitude"]
+    label = loc.get("name", city)
+    if country := loc.get("country"):
+        label = f"{label}, {country}"
+
+    weather_url = "https://api.open-meteo.com/v1/forecast?" + urllib.parse.urlencode(
+        {
+            "latitude": lat,
+            "longitude": lon,
+            "current": "temperature_2m,apparent_temperature,relative_humidity_2m,weathercode,windspeed_10m",
+            "timezone": "auto",
+        }
+    )
+    try:
+        with urllib.request.urlopen(weather_url, timeout=10) as r:
+            data = json.loads(r.read())
+    except Exception as e:
+        return f"Error fetching weather: {e}"
+
+    c = data.get("current", {})
+    condition = _WMO.get(c.get("weathercode", 0), f"code {c.get('weathercode')}")
+    return (
+        f"{label}: {c.get('temperature_2m')}°C"
+        f" (feels like {c.get('apparent_temperature')}°C)"
+        f", {condition}"
+        f", {c.get('relative_humidity_2m')}% humidity"
+        f", wind {c.get('windspeed_10m')} km/h"
+    )
 
 
 def read_file(path: str) -> str:
@@ -90,14 +140,43 @@ def mcp_count_words(text: str) -> int:
     return _import_call_mcp()(_MCP_SERVER, "count_words", text=text)
 
 
-def web_search(query: str) -> str:
-    # Stub — replace with Brave Search API, SerpAPI, Tavily, etc.
-    return (
-        f"[stub] Search results for '{query}':\n"
-        f"1. Wikipedia: {query.split()[0].title()} — comprehensive overview\n"
-        f"2. Recent article: '{query}' explained in 5 minutes\n"
-        f"3. Official docs: {query.split()[0].lower()}.org"
+def web_search(query: str, count: int = 5) -> str:
+    import json
+    import os
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    api_key = os.environ.get("BRAVE_API_KEY")
+    if not api_key:
+        return "Error: BRAVE_API_KEY not set in environment"
+
+    url = "https://api.search.brave.com/res/v1/web/search?" + urllib.parse.urlencode(
+        {"q": query, "count": min(count, 10)}
     )
+    req = urllib.request.Request(
+        url,
+        headers={"Accept": "application/json", "X-Subscription-Token": api_key},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        return f"Error: Brave Search API returned {e.code} {e.reason}"
+    except Exception as e:
+        return f"Error: {e}"
+
+    results = data.get("web", {}).get("results", [])
+    if not results:
+        return f"No results found for '{query}'"
+
+    lines = [f"Search results for '{query}':\n"]
+    for i, r in enumerate(results, 1):
+        title = r.get("title", "")
+        url = r.get("url", "")
+        desc = r.get("description", "")
+        lines.append(f"{i}. {title}\n   {url}\n   {desc}")
+    return "\n".join(lines)
 
 
 # --- Registry: name → callable ---
@@ -146,7 +225,7 @@ TOOL_SCHEMAS: list[dict] = [
         "type": "function",
         "function": {
             "name": "get_weather",
-            "description": "Gets current weather for a given city.",
+            "description": "Gets current weather for a city via Open-Meteo (temperature, conditions, humidity, wind).",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -217,11 +296,16 @@ TOOL_SCHEMAS: list[dict] = [
         "type": "function",
         "function": {
             "name": "web_search",
-            "description": "Searches the web for information on a topic or question.",
+            "description": "Searches the web via Brave Search and returns the top results.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string", "description": "Search query"}
+                    "query": {"type": "string", "description": "Search query"},
+                    "count": {
+                        "type": "integer",
+                        "description": "Number of results to return (1–10, default 5)",
+                        "default": 5,
+                    },
                 },
                 "required": ["query"],
             },

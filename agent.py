@@ -59,9 +59,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--local-model",
-        default="qwen2.5",
+        default="mygemma4",
         metavar="MODEL",
-        help="Ollama model for local/mixed mode (default: qwen2.5). "
+        help="Ollama model for local/mixed mode (default: mygemma4). "
              "Any model that supports function calling works: qwen2.5, mistral-nemo, llama3.2, ...",
     )
     p.add_argument(
@@ -78,7 +78,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         metavar="MODEL",
         help=(
             "Cloud model name. Defaults: "
-            "openai→gpt-4o-mini, anthropic→claude-haiku-4-5-20251001, gemini→gemini-2.0-flash"
+            "openai→gpt-5-mini, anthropic→claude-haiku-4.5, gemini→gemini-2.5-flash"
         ),
     )
     p.add_argument(
